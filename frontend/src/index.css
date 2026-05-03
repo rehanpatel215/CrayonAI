@@ -1,0 +1,61 @@
+:root {
+  /* Color Palette - Deep Dark Theme */
+  --bg-primary: #0a0c10;
+  --bg-secondary: #161b22;
+  --accent-primary: #58a6ff; /* Neon Blue */
+  --accent-secondary: #7ee787; /* Success Green */
+  --accent-traffic: #f85149; /* Traffic Red */
+  --text-main: #c9d1d9;
+  --text-dim: #8b949e;
+  --glass-bg: rgba(22, 27, 34, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-main);
+  overflow: hidden;
+  margin: 0;
+}
+
+/* Glassmorphism Utility */
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+}
+
+/* Glowing Neon Path Animation */
+@keyframes dash {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.route-path-primary {
+  filter: drop-shadow(0 0 10px var(--accent-primary));
+  stroke-dasharray: 2000;
+  stroke-dashoffset: 2000;
+  animation: dash 3s linear forwards;
+}
+
+.route-path-alt {
+  filter: drop-shadow(0 0 6px #ffcc00);
+  stroke-dasharray: 10, 10;
+  stroke-dashoffset: 1000;
+  animation: dash 5s linear forwards;
+}
+
+#root {
+  width: 100%;
+  height: 100vh;
+}
