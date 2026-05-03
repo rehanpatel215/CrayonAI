@@ -2,7 +2,6 @@
 
 CrayonAI is a high-performance, visually immersive pathfinding application that leverages real-world geospatial data to optimize travel routes. It goes beyond simple navigation by visualizing the internal decision-making process of various AI pathfinding algorithms.
 
-![CrayonAI Banner](https://images.unsplash.com/photo-1526628953301-3e589a6a8b74?q=80&w=1200&auto=format&fit=crop)
 
 ## 🚀 Features
 
