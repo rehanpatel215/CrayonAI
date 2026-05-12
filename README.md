@@ -36,7 +36,7 @@ CrayonAI is a high-performance, visually immersive pathfinding application that 
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/yourusername/RouteMindAI.git
+git clone https://github.com/rehanpatel215/CrayonAI.git
 cd CrayonAI
 ```
 
