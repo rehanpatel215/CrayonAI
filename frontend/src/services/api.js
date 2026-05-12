@@ -65,3 +65,25 @@ export const loadCity = async (city) => {
     return null;
   }
 };
+
+export const fetchTrafficState = async () => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/traffic_state`);
+    return await response.json();
+  } catch (error) {
+    console.error("Error fetching traffic state:", error);
+    return null;
+  }
+};
+
+export const simulateTick = async () => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/simulate_tick`, {
+      method: 'POST',
+    });
+    return await response.json();
+  } catch (error) {
+    console.error("Error simulating tick:", error);
+    return null;
+  }
+};

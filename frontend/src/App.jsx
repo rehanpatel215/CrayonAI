@@ -3,7 +3,8 @@ import Sidebar from './components/Sidebar';
 import MapContainer from './components/MapContainer';
 import ComparisonPanel from './components/ComparisonPanel';
 import GraphVisualizer from './components/GraphVisualizer';
-import { fetchRoute, updateTraffic, geocodePlace, loadCity } from './services/api';
+import ComparisonDashboard from './components/ComparisonDashboard';
+import { fetchRoute, updateTraffic, geocodePlace, loadCity, fetchTrafficState, simulateTick } from './services/api';
 import './App.css';
 
 function App() {
@@ -24,6 +25,50 @@ function App() {
   const [showVisualizerPrompt, setShowVisualizerPrompt] = useState(false);
   const [isVisualizing, setIsVisualizing] = useState(false);
   const [visualizerData, setVisualizerData] = useState(null);
+  const [isSimulating, setIsSimulating] = useState(false);
+  const [trafficEvents, setTrafficEvents] = useState([]);
+  const [currentView, setCurrentView] = useState('map'); // 'map' or 'dashboard'
+  const [dashboardData, setDashboardData] = useState(null);
+  const [isComparingAll, setIsComparingAll] = useState(false);
+
+  // Recursive simulation loop
+  useEffect(() => {
+    let timeoutId;
+    
+    const runTick = async () => {
+      if (!isSimulating) return;
+
+      const data = await simulateTick();
+      if (data && data.events) {
+        // Events are already capped on backend, but we ensure frontend state is fresh
+        setTrafficEvents(data.events.slice(-20)); 
+      }
+
+      // If we have a route, re-fetch it to account for new traffic
+      // We always use 'travel_time' during simulation as requested
+      if (start && end) {
+        try {
+          const routeData = await fetchRoute(start, end, algorithm, 'travel_time');
+          if (routeData && !routeData.error) {
+            setRoutes(routeData.paths || []);
+          }
+        } catch (err) {
+          console.error("Simulation route fetch failed", err);
+        }
+      }
+
+      timeoutId = setTimeout(runTick, 2000);
+    };
+
+    if (isSimulating) {
+      setPreference('travel_time');
+      runTick();
+    }
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [isSimulating, start, end, algorithm]); // Dependencies for re-fetching
 
   const handleRegionChange = async () => {
     // ... rest of handleRegionChange
@@ -114,14 +159,45 @@ function App() {
         }
         
         // Finalize paths and metrics
-        setRoutes(data.paths || []);
         setMetrics({
           distance: data.paths[0]?.distance || 0,
           altDistance: data.paths[1]?.distance || null,
           time: data.paths[0]?.time || 0,
-          nodesExplored: data.nodes_explored,
-          algoTime: data.algo_time
+          nodes_explored: data.nodes_explored,
+          algo_time: data.algo_time
         });
+        
+        // Snap markers to actual road nodes
+        if (data.start_node_coords) setStart(data.start_node_coords);
+        if (data.end_node_coords) setEnd(data.end_node_coords);
+        
+        // Pause for 1 second after exploration before drawing paths
+        await new Promise(r => setTimeout(r, 1000));
+
+        // Staggered path drawing animation
+        const finalPaths = data.paths || [];
+        const animatedPaths = finalPaths.map(p => ({ ...p, segments: p.segments.map(s => ({ ...s, coords: [] })) }));
+        setRoutes(animatedPaths);
+
+        for (let pIdx = 0; pIdx < finalPaths.length; pIdx++) {
+          const fullPath = finalPaths[pIdx];
+          for (let sIdx = 0; sIdx < fullPath.segments.length; sIdx++) {
+            const fullSegment = fullPath.segments[sIdx];
+            const coords = fullSegment.coords;
+            const step = Math.max(1, Math.floor(coords.length / 10));
+            
+            for (let i = 0; i <= coords.length; i += step) {
+              const currentCoords = coords.slice(0, Math.min(i + step, coords.length));
+              setRoutes(prev => {
+                const newRoutes = [...prev];
+                newRoutes[pIdx].segments[sIdx].coords = currentCoords;
+                return newRoutes;
+              });
+              await new Promise(r => setTimeout(r, 10));
+            }
+          }
+        }
+
         setVisualizerData(data.graph_data);
         setStatusMessage('Success!');
         
@@ -141,32 +217,32 @@ function App() {
   };
 
   const handleCompare = async () => {
-    setLoading(true);
     const { finalStart, finalEnd } = await resolveLocations();
-
     if (!finalStart || !finalEnd) {
-      setLoading(false);
       alert("Select start and end points first!");
       return;
     }
 
-    const algorithms = ['dijkstra', 'astar', 'greedy'];
-    const results = {};
-
-    for (const algo of algorithms) {
-      const data = await fetchRoute(finalStart, finalEnd, algo, preference);
+    setIsComparingAll(true);
+    try {
+      const response = await fetch('http://localhost:5000/api/compare', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ start: finalStart, end: finalEnd, preference })
+      });
+      const data = await response.json();
       if (data && !data.error) {
-        results[algo] = {
-          distance: data.paths[0].distance,
-          time: data.paths[0].time,
-          nodesExplored: data.nodes_explored,
-          algoTime: data.algo_time
-        };
+        setDashboardData(data);
+        setCurrentView('dashboard');
+      } else {
+        alert("Comparison failed: " + (data.error || "Unknown error"));
       }
+    } catch (err) {
+      console.error(err);
+      alert("Network error: Could not connect to comparison engine");
+    } finally {
+      setIsComparingAll(false);
     }
-
-    setComparisonData(results);
-    setLoading(false);
   };
 
   const handleClear = () => {
@@ -199,6 +275,9 @@ function App() {
         onClear={handleClear}
         onCompare={handleCompare}
         onRegionChange={handleRegionChange}
+        isSimulating={isSimulating}
+        setIsSimulating={setIsSimulating}
+        trafficEvents={trafficEvents}
       />
       
       <main className="app-content">
@@ -237,8 +316,8 @@ function App() {
               {metrics.altDistance && <span><strong>Alt:</strong> {metrics.altDistance} km</span>}
             </div>
             <div className="stat-row">
-              <span><strong>Time:</strong> {metrics.algoTime} sec</span>
-              <span><strong>Nodes:</strong> {metrics.nodesExplored}</span>
+              <span><strong>Time:</strong> {metrics.algo_time} sec</span>
+              <span><strong>Nodes:</strong> {metrics.nodes_explored}</span>
             </div>
           </div>
         )}
@@ -247,6 +326,21 @@ function App() {
           <ComparisonPanel 
             data={comparisonData} 
             onClose={() => setComparisonData(null)} 
+          />
+        )}
+
+        {isComparingAll && (
+          <div className="loading-dashboard">
+            <div className="spinner"></div>
+            <h2>Running Comparative Analysis...</h2>
+            <p>Evaluating 5 different algorithms under current traffic conditions</p>
+          </div>
+        )}
+
+        {currentView === 'dashboard' && (
+          <ComparisonDashboard 
+            data={dashboardData} 
+            onClose={() => setCurrentView('map')} 
           />
         )}
 

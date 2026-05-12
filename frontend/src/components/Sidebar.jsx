@@ -15,7 +15,10 @@ const Sidebar = ({
   onNavigate, 
   onClear,
   onCompare,
-  onRegionChange
+  onRegionChange,
+  isSimulating,
+  setIsSimulating,
+  trafficEvents
 }) => {
   const handleRegionKey = (e) => {
     if (e.key === 'Enter') onRegionChange();
@@ -67,11 +70,32 @@ const Sidebar = ({
           value={preference} 
           onChange={(e) => setPreference(e.target.value)}
           className="dropdown-select"
+          disabled={isSimulating}
         >
           <option value="length">Shortest</option>
           <option value="travel_time">Fastest</option>
         </select>
       </div>
+
+      <div className="simulation-controls control-group">
+        <button 
+          className={`btn-sim ${isSimulating ? 'active' : ''}`}
+          onClick={() => setIsSimulating(!isSimulating)}
+        >
+          {isSimulating ? 'Stop Simulation' : 'Start Simulation'}
+        </button>
+      </div>
+
+      {trafficEvents.length > 0 && (
+        <div className="event-log">
+          <h4>Live Traffic Events</h4>
+          <div className="event-list">
+            {trafficEvents.slice().reverse().map((event, i) => (
+              <div key={i} className="event-item">{event}</div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="action-buttons">
         <button className="btn-primary" onClick={onNavigate}>

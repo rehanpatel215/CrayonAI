@@ -76,6 +76,31 @@ def update_traffic():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/traffic_state', methods=['GET'])
+def get_traffic_state():
+    """Returns all edge states and current events."""
+    try:
+        # Convert tuple keys to strings for JSON serialization
+        traffic_serializable = {f"{u},{v}": state for (u, v), state in graph_engine.edge_traffic.items()}
+        return jsonify({
+            "traffic": traffic_serializable,
+            "events": graph_engine.traffic_events
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/simulate_tick', methods=['POST'])
+def simulate_tick():
+    """Advance simulation one step."""
+    try:
+        graph_engine.tick()
+        return jsonify({
+            "message": "Tick successful",
+            "events": graph_engine.traffic_events
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/api/route', methods=['POST'])
 def find_route():
     """
@@ -97,6 +122,68 @@ def find_route():
         else:
             return jsonify({"error": "No path found between selected locations"}), 404
     except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+import google.generativeai as genai
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# Configure Gemini
+api_key = os.getenv("GEMINI_API_KEY")
+if api_key:
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel('gemini-2.5-flash')
+else:
+    model = None
+
+@app.route('/api/compare', methods=['POST'])
+def compare_algorithms():
+    """
+    Run all algorithms and return stats + AI analysis.
+    """
+    data = request.json
+    start = data.get('start')
+    end = data.get('end')
+    preference = data.get('preference', 'length')
+
+    if not start or not end:
+        return jsonify({"error": "Missing start or end coordinates"}), 400
+
+    try:
+        # 1. Get raw stats from engine
+        stats = graph_engine.compare_all_algorithms(start, end, preference)
+        
+        # 2. Generate AI analysis if possible
+        ai_analysis = "AI analysis unavailable (API key missing or error)."
+        if model:
+            try:
+                prompt = f"""
+                Act as a Smart Traffic Analyst for an AI Pathfinding System.
+                Analyze these pathfinding results for a route in {graph_engine.current_location}:
+                
+                Results: {stats}
+                
+                Please provide:
+                1. A brief summary of which algorithm performed best and why.
+                2. Trade-offs between speed (execution time) and path optimality (distance/time).
+                3. A specific recommendation based on current traffic conditions (preference was {preference}).
+                4. Insights into search space efficiency (nodes explored).
+                
+                Keep it professional, insightful, and concise.
+                """
+                response = model.generate_content(prompt)
+                ai_analysis = response.text
+            except Exception as ai_err:
+                print(f"Gemini API Error: {ai_err}")
+                ai_analysis = "AI analysis failed due to an external error."
+
+        return jsonify({
+            "stats": stats,
+            "ai_analysis": ai_analysis
+        })
+    except Exception as e:
+        print(f"Comparison Error: {e}")
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':

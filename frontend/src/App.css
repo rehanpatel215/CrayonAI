@@ -264,6 +264,74 @@
   flex-direction: column;
   gap: 10px;
 }
+/* Simulation Styles */
+.btn-sim {
+  width: 100%;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-sim.active {
+  background: rgba(255, 51, 51, 0.2);
+  border-color: rgba(255, 51, 51, 0.4);
+  color: #ff6666;
+  box-shadow: 0 0 15px rgba(255, 51, 51, 0.1);
+}
+
+.btn-sim:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.event-log {
+  margin-top: 20px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 12px;
+  padding: 15px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  max-height: 250px;
+  display: flex;
+  flex-direction: column;
+}
+
+.event-log h4 {
+  margin: 0 0 10px 0;
+  font-size: 0.9rem;
+  color: #8b949e;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.event-list {
+  overflow-y: auto;
+  flex: 1;
+}
+
+.event-item {
+  font-size: 0.85rem;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  color: #c9d1d9;
+  animation: fadeIn 0.3s ease;
+}
+
+.event-item:last-child {
+  border-bottom: none;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.explored-node-marker {
+  animation: fadeIn 0.3s ease-out forwards;
+}
 
 .stat {
   display: flex;

@@ -1,5 +1,8 @@
 # Python
 __pycache__/
+backend/__pycache__/
+backend/data/
+backend/.env
 *.py[cod]
 *$py.class
 data/*.pkl
