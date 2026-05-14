@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Cpu, SkipForward } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
 
 const AIAnalystPanel = ({ text }) => {
   const [displayedText, setDisplayedText] = useState('');
@@ -44,14 +43,14 @@ const AIAnalystPanel = ({ text }) => {
 
       <div className="ai-body">
         {displayedText}
-        {isTyping && <motion.span 
-          animate={{ opacity: [1, 0] }} 
-          transition={{ repeat: Infinity, duration: 0.8 }}
+        {isTyping && <span 
+          className="typing-cursor"
           style={{ display: 'inline-block', width: '3px', height: '1.2em', background: 'var(--accent-blue)', marginLeft: '4px', verticalAlign: 'middle', borderRadius: '4px' }}
         />}
       </div>
     </div>
   );
 };
+
 
 export default AIAnalystPanel;

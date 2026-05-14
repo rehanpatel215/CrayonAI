@@ -41,6 +41,11 @@
   box-sizing: border-box;
 }
 
+.floating-tile::before,
+.floating-tile::after {
+  display: none !important;
+}
+
 .floating-tile:hover {
   transform: translateY(-2px);
   box-shadow: 0 15px 45px rgba(0, 0, 0, 0.25);
@@ -116,10 +121,18 @@
   overflow: visible;
 }
 
+.route-path-primary {
+  filter: drop-shadow(0 0 15px var(--accent-red-bright));
+}
+
+.route-path-alt {
+  filter: drop-shadow(0 0 10px var(--accent-yellow));
+}
+
 .brand-road-path {
-  stroke-dasharray: 60;
-  stroke-dashoffset: 60;
-  animation: logoDraw 4s ease-in-out infinite;
+  stroke-dasharray: none;
+  stroke-dashoffset: 0;
+  animation: none;
 }
 
 .brand-crayon {
@@ -603,3 +616,12 @@
   border-bottom-left-radius: 16px !important;
   border-bottom-right-radius: 16px !important;
 }
+
+@keyframes typing-cursor-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.typing-cursor {
+  animation: typing-cursor-blink 0.8s infinite;
+}

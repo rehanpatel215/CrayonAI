@@ -17,16 +17,21 @@ const GraphVisualizer = ({ data, onClose }) => {
     3: "#ea4335"
   };
 
-  // Find min/max for scaling
-  const bounds = useMemo(() => {
+  // Find min/max for scaling and create a fast-lookup Map
+  const { bounds, nodeMap } = useMemo(() => {
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    const nMap = new Map();
     data.nodes.forEach(n => {
       if (n.lng < minX) minX = n.lng;
       if (n.lng > maxX) maxX = n.lng;
       if (n.lat < minY) minY = n.lat;
       if (n.lat > maxY) maxY = n.lat;
+      nMap.set(n.id, n);
     });
-    return { minX, minY, maxX, maxY, width: maxX - minX, height: maxY - minY };
+    return { 
+      bounds: { minX, minY, maxX, maxY, width: maxX - minX, height: maxY - minY },
+      nodeMap: nMap
+    };
   }, [data]);
 
   const scale = (val, min, total, size) => {
@@ -36,6 +41,23 @@ const GraphVisualizer = ({ data, onClose }) => {
   const PADDING = 50;
   const VIEW_WIDTH = 1000;
   const VIEW_HEIGHT = 800;
+
+  // Pre-calculate path strings for discarded links to avoid thousands of <line> components
+  const discardedPathData = useMemo(() => {
+    let path = "";
+    data.links.filter(l => l.type === 3).forEach(link => {
+      const source = nodeMap.get(link.source);
+      const target = nodeMap.get(link.target);
+      if (source && target) {
+        const x1 = scale(source.lng, bounds.minX, bounds.width, VIEW_WIDTH - 2*PADDING) + PADDING;
+        const y1 = VIEW_HEIGHT - (scale(source.lat, bounds.minY, bounds.height, VIEW_HEIGHT - 2*PADDING) + PADDING);
+        const x2 = scale(target.lng, bounds.minX, bounds.width, VIEW_WIDTH - 2*PADDING) + PADDING;
+        const y2 = VIEW_HEIGHT - (scale(target.lat, bounds.minY, bounds.height, VIEW_HEIGHT - 2*PADDING) + PADDING);
+        path += `M ${x1} ${y1} L ${x2} ${y2} `;
+      }
+    });
+    return path;
+  }, [data, bounds, nodeMap]);
 
   return (
     <div className="visualizer-page">
@@ -54,28 +76,20 @@ const GraphVisualizer = ({ data, onClose }) => {
 
       <div className="graph-container glass">
         <svg viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`} className="graph-svg">
-          {/* Render Discarded Edges First */}
-          {data.links.filter(l => l.type === 3).map((link, i) => {
-            const source = data.nodes.find(n => n.id === link.source);
-            const target = data.nodes.find(n => n.id === link.target);
-            if (!source || !target) return null;
-            return (
-              <line
-                key={`d-${i}`}
-                x1={scale(source.lng, bounds.minX, bounds.width, VIEW_WIDTH - 2*PADDING) + PADDING}
-                y1={VIEW_HEIGHT - (scale(source.lat, bounds.minY, bounds.height, VIEW_HEIGHT - 2*PADDING) + PADDING)}
-                x2={scale(target.lng, bounds.minX, bounds.width, VIEW_WIDTH - 2*PADDING) + PADDING}
-                y2={VIEW_HEIGHT - (scale(target.lat, bounds.minY, bounds.height, VIEW_HEIGHT - 2*PADDING) + PADDING)}
-                stroke={colors[3]}
-                strokeWidth="1"
-              />
-            );
-          })}
+          {/* Render Discarded Edges as a single path for massive performance gain */}
+          {discardedPathData && (
+            <path 
+              d={discardedPathData} 
+              stroke={colors[3]} 
+              strokeWidth="1" 
+              fill="none" 
+            />
+          )}
 
-          {/* Render Primary and Alt Edges on top */}
+          {/* Render Primary and Alt Edges (fewer, so individual lines are fine for interactivity if needed) */}
           {data.links.filter(l => l.type !== 3).map((link, i) => {
-            const source = data.nodes.find(n => n.id === link.source);
-            const target = data.nodes.find(n => n.id === link.target);
+            const source = nodeMap.get(link.source);
+            const target = nodeMap.get(link.target);
             if (!source || !target) return null;
             return (
               <line
@@ -91,10 +105,10 @@ const GraphVisualizer = ({ data, onClose }) => {
             );
           })}
 
-          {/* Render Nodes */}
+          {/* Render Nodes (interactivity preserved) */}
           {data.nodes.map((node, i) => (
             <circle
-              key={i}
+              key={node.id}
               cx={scale(node.lng, bounds.minX, bounds.width, VIEW_WIDTH - 2*PADDING) + PADDING}
               cy={VIEW_HEIGHT - (scale(node.lat, bounds.minY, bounds.height, VIEW_HEIGHT - 2*PADDING) + PADDING)}
               r={node.type !== 3 ? 5 : 2}
@@ -113,5 +127,6 @@ const GraphVisualizer = ({ data, onClose }) => {
     </div>
   );
 };
+
 
 export default GraphVisualizer;

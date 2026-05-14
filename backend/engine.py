@@ -135,7 +135,7 @@ class GraphEngine:
             elif algorithm == 'astar':
                 primary_path, explored_nodes, explored_edges = self._astar_with_exploration(start_node, end_node, weight)
             elif algorithm == 'greedy':
-                primary_path, explored_nodes, explored_edges = self._greedy_with_exploration(start_node, end_node)
+                primary_path, explored_nodes, explored_edges = self._greedy_with_exploration(start_node, end_node, weight)
             else:
                 primary_path = nx.shortest_path(self.graph, start_node, end_node, weight=weight)
                 explored_nodes, explored_edges = [], []
@@ -272,10 +272,11 @@ class GraphEngine:
             try:
                 start_time = time.time()
                 # Run the algorithm
-                if name in ['dijkstra', 'astar']:
+                if name in ['dijkstra', 'astar', 'greedy']:
                     path, explored, edges = func(start_node, end_node, weight_attr)
                 else:
                     path, explored, edges = func(start_node, end_node)
+
                 
                 exec_time = (time.time() - start_time) * 1000 # in ms
                 
@@ -339,6 +340,7 @@ class GraphEngine:
                     predecessors[neighbor] = current
                     explored_edges.append({"from": current, "to": neighbor})
                     queue.append(neighbor)
+
         return [], explored_nodes, explored_edges
 
     def _dfs_with_exploration(self, start, end, max_explored=10000):
@@ -370,6 +372,7 @@ class GraphEngine:
                     predecessors[neighbor] = current
                     explored_edges.append({"from": current, "to": neighbor})
                     stack.append(neighbor)
+
         return [], explored_nodes, explored_edges
 
     def _dijkstra_with_exploration(self, start, end, weight_attr):
@@ -397,7 +400,6 @@ class GraphEngine:
             
             for neighbor in self.graph.neighbors(current):
                 if neighbor in visited: continue
-                explored_edges.append({"from": current, "to": neighbor})
                 # Safe weight lookup with fallback
                 edge_data = self.graph.get_edge_data(current, neighbor)[0]
                 weight = edge_data.get(weight_attr)
@@ -412,8 +414,12 @@ class GraphEngine:
                 if new_dist < distances.get(neighbor, float('inf')):
                     distances[neighbor] = new_dist
                     predecessors[neighbor] = current
+                    explored_edges.append({"from": current, "to": neighbor})
                     heapq.heappush(pq, (new_dist, neighbor))
         return [], explored_nodes, explored_edges
+
+
+
 
     def _astar_with_exploration(self, start, end, weight_attr):
         import heapq
@@ -441,7 +447,6 @@ class GraphEngine:
             
             for neighbor in self.graph.neighbors(current):
                 if neighbor in visited: continue
-                explored_edges.append({"from": current, "to": neighbor})
                 edge_data = self.graph.get_edge_data(current, neighbor)[0]
                 edge_weight = edge_data.get(weight_attr)
                 if edge_weight is None:
@@ -455,14 +460,19 @@ class GraphEngine:
                 if tentative_g_score < g_score.get(neighbor, float('inf')):
                     g_score[neighbor] = tentative_g_score
                     predecessors[neighbor] = current
+                    explored_edges.append({"from": current, "to": neighbor})
                     h_score = self._dist_heuristic(neighbor, end, weight_attr)
                     f_score[neighbor] = tentative_g_score + h_score
                     heapq.heappush(pq, (f_score[neighbor], neighbor))
         return [], explored_nodes, explored_edges
 
-    def _greedy_with_exploration(self, start, end):
+
+
+
+    def _greedy_with_exploration(self, start, end, weight_attr='length'):
         import heapq
-        pq = [(self._dist_heuristic(start, end), start)]
+        # Greedy only uses the heuristic (h)
+        pq = [(self._dist_heuristic(start, end, weight_attr), start)]
         predecessors = {start: None}
         explored_nodes = []
         explored_edges = []
@@ -483,32 +493,37 @@ class GraphEngine:
                 if neighbor not in visited:
                     predecessors[neighbor] = current
                     explored_edges.append({"from": current, "to": neighbor})
-                    heapq.heappush(pq, (self._dist_heuristic(neighbor, end), neighbor))
+                    heapq.heappush(pq, (self._dist_heuristic(neighbor, end, weight_attr), neighbor))
         return [], explored_nodes, explored_edges
+
 
     def _dist_heuristic(self, u, v, weight_attr='length'):
         """
-        Heuristic function for A* (Great Circle distance).
-        Returns meters for 'length', and estimated seconds for 'travel_time'.
+        Heuristic function for A* and Greedy search.
+        Uses a simplified Great Circle distance in meters.
+        For 'travel_time', it estimates the seconds needed to travel that distance.
         """
         u_data = self.graph.nodes[u]
         v_data = self.graph.nodes[v]
         
-        # Dynamic adjustment for latitude to stay accurate globally
-        avg_lat = (u_data['y'] + v_data['y']) / 2
         import math
-        cos_lat = math.cos(math.radians(avg_lat))
-        
-        dy = (u_data['y'] - v_data['y']) * 111000
-        dx = (u_data['x'] - v_data['x']) * 111000 * cos_lat
+        # 111,320 meters per degree is a standard approximation
+        dy = (u_data['y'] - v_data['y']) * 111320
+        dx = (u_data['x'] - v_data['x']) * 111320 * math.cos(math.radians(u_data['y']))
         
         dist_meters = math.sqrt(dx**2 + dy**2)
         
         if weight_attr == 'travel_time':
-            # Use a high speed (e.g. 100km/h = 27.7 m/s) to ensure heuristic is admissible
-            return dist_meters / 27.7
+            # Use 25.0 m/s (90 kph) as a tight but safe upper bound for Manhattan/Urban areas.
+            # This makes the heuristic closer to real travel times than 100kph+,
+            # ensuring A* stays focused in a narrow corridor.
+            return dist_meters / 25.0
         
         return dist_meters
+
+
+
+
 
     def update_traffic(self, congestion_level):
         """

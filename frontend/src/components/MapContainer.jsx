@@ -55,9 +55,46 @@ const MapViewHandler = ({ center, start, end, routes }) => {
         } else if (center) {
             map.flyTo(center, 13, { duration: 1.5 });
         }
-    }, [start, end, center, map]); // Removed 'routes' from dependencies to stop zooming while searching
+    }, [start, end, center, map]); 
 
     return null;
+};
+
+// Optimized layer for explored nodes to avoid React component overhead
+const ExploredNodesLayer = ({ nodes }) => {
+  const map = useMap();
+  const layerRef = React.useRef(null);
+
+  useEffect(() => {
+    layerRef.current = L.layerGroup().addTo(map);
+    return () => {
+      if (layerRef.current) {
+        layerRef.current.remove();
+      }
+    };
+  }, [map]);
+
+  useEffect(() => {
+    if (!layerRef.current) return;
+    
+    layerRef.current.clearLayers();
+    
+    // Only render if we have nodes, and batch them
+    if (nodes && nodes.length > 0) {
+      nodes.forEach(node => {
+        L.circleMarker([node.lat, node.lng], {
+          radius: 2,
+          color: '#4285f4', // Use hex for direct Leaflet
+          fillColor: '#4285f4',
+          fillOpacity: 0.8,
+          stroke: false,
+          interactive: false // Significant performance boost
+        }).addTo(layerRef.current);
+      });
+    }
+  }, [nodes]);
+
+  return null;
 };
 
 const MapContainer = ({ center, start, end, onMapClick, routes, exploredNodes }) => {
@@ -69,7 +106,7 @@ const MapContainer = ({ center, start, end, onMapClick, routes, exploredNodes })
         center={center || [40.7128, -74.0060]} 
         zoom={13} 
         scrollWheelZoom={true}
-        zoomControl={false} // Disable default top-left controls
+        zoomControl={false} 
         preferCanvas={true}
         style={{ height: "100%", width: "100%" }}
       >
@@ -83,21 +120,8 @@ const MapContainer = ({ center, start, end, onMapClick, routes, exploredNodes })
         <MapEvents onMapClick={onMapClick} />
         <MapViewHandler center={center} start={start} end={end} routes={routes} />
 
-        {/* Render Explored Nodes as discrete dots */}
-        {exploredNodes && exploredNodes.map((node, idx) => (
-          <CircleMarker 
-            key={idx}
-            center={[node.lat, node.lng]}
-            radius={2}
-            pathOptions={{ 
-              color: 'var(--accent-blue)', 
-              fillColor: 'var(--accent-blue)', 
-              fillOpacity: 0.8, 
-              stroke: false,
-              className: 'explored-node-marker' 
-            }}
-          />
-        ))}
+        {/* Optimized Explored Nodes Layer */}
+        <ExploredNodesLayer nodes={exploredNodes} />
 
         {start && (
           <Marker position={[start.lat, start.lng]} icon={greenIcon}>
@@ -111,13 +135,14 @@ const MapContainer = ({ center, start, end, onMapClick, routes, exploredNodes })
 
         {/* Render Multiple Routes */}
         {routes && routes.map((route, index) => {
+          const routeKey = route.id || index;
           if (route.segments) {
             return route.segments.map((segment, sIdx) => (
               <Polyline 
-                key={`${index}-${sIdx}`}
+                key={`${routeKey}-${sIdx}`}
                 positions={segment.coords.map(p => [p.lat, p.lng])}
                 pathOptions={{ 
-                  color: index === 0 ? getTrafficColor(segment.state) : 'var(--accent-yellow)', 
+                  color: index === 0 ? getTrafficColor(segment.state) : '#ffcc00', 
                   weight: index === 0 ? 8 : 5, 
                   opacity: index === 0 ? 0.95 : 0.7,
                   dashArray: index === 0 ? null : (segment.state === 'blocked' ? "5, 5" : null),
@@ -128,10 +153,10 @@ const MapContainer = ({ center, start, end, onMapClick, routes, exploredNodes })
           }
           return (
             <Polyline 
-              key={index}
+              key={routeKey}
               positions={route.coords.map(p => [p.lat, p.lng])}
               pathOptions={{ 
-                color: index === 0 ? 'var(--accent-blue)' : 'var(--accent-yellow)', 
+                color: index === 0 ? '#4285f4' : '#ffcc00', 
                 weight: index === 0 ? 8 : 5, 
                 opacity: index === 0 ? 0.95 : 0.7,
                 dashArray: index === 0 ? null : "10, 10",
@@ -144,5 +169,6 @@ const MapContainer = ({ center, start, end, onMapClick, routes, exploredNodes })
     </div>
   );
 };
+
 
 export default MapContainer;

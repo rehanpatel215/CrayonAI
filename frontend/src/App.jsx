@@ -4,7 +4,7 @@ import MapContainer from './components/MapContainer';
 import ComparisonPanel from './components/ComparisonPanel';
 import GraphVisualizer from './components/GraphVisualizer';
 import ComparisonDashboard from './components/ComparisonDashboard';
-import { fetchRoute, updateTraffic, geocodePlace, loadCity, fetchTrafficState, simulateTick } from './services/api';
+import { fetchRoute, updateTraffic, geocodePlace, loadCity, fetchTrafficState, simulateTick, compareRoutes } from './services/api';
 import './App.css';
 import FloatingTile from './components/FloatingTile';
 import LocationInput from './components/LocationInput';
@@ -36,24 +36,41 @@ function App() {
   const [dashboardData, setDashboardData] = useState(null);
   const [isComparingAll, setIsComparingAll] = useState(false);
 
-  // Recursive simulation loop
+  // Refs for simulation and animation aborts
+  const simAbortRef = React.useRef(false);
+  const animAbortRef = React.useRef(false);
+  const startRef = React.useRef(start);
+  const endRef = React.useRef(end);
+  const algoRef = React.useRef(algorithm);
+
+  React.useEffect(() => { startRef.current = start; }, [start]);
+  React.useEffect(() => { endRef.current = end; }, [end]);
+  React.useEffect(() => { algoRef.current = algorithm; }, [algorithm]);
+
+  // Recursive simulation loop with abort protection
   useEffect(() => {
+    simAbortRef.current = false;
     let timeoutId;
     
     const runTick = async () => {
-      if (!isSimulating) return;
+      if (simAbortRef.current || !isSimulating) return;
 
       const data = await simulateTick();
+      if (simAbortRef.current) return; 
+
       if (data && data.events) {
-        // Events are already capped on backend, but we ensure frontend state is fresh
         setTrafficEvents(data.events.slice(-20)); 
       }
 
-      // If we have a route, re-fetch it to account for new traffic
-      // We always use 'travel_time' during simulation as requested
-      if (start && end) {
+      const currentStart = startRef.current;
+      const currentEnd = endRef.current;
+      const currentAlgo = algoRef.current;
+
+      // Only auto-update if not manually calculating a route
+      if (currentStart && currentEnd && !isCalculating && !animAbortRef.current) {
         try {
-          const routeData = await fetchRoute(start, end, algorithm, 'travel_time');
+          const routeData = await fetchRoute(currentStart, currentEnd, currentAlgo, 'travel_time');
+          if (simAbortRef.current || isCalculating) return;
           if (routeData && !routeData.error) {
             setRoutes(routeData.paths || []);
           }
@@ -61,6 +78,7 @@ function App() {
           console.error("Simulation route fetch failed", err);
         }
       }
+
 
       timeoutId = setTimeout(runTick, 2000);
     };
@@ -71,19 +89,18 @@ function App() {
     }
 
     return () => {
+      simAbortRef.current = true;
       if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [isSimulating, start, end, algorithm]); // Dependencies for re-fetching
+  }, [isSimulating]); 
 
   const handleRegionChange = async () => {
-    // ... rest of handleRegionChange
     if (!regionCity) return;
     setStatusMessage(`Loading 30km Area: ${regionCity} (May take 1-2 mins)...`);
     const data = await loadCity(regionCity);
     if (data && !data.error) {
       handleClear();
       
-      // Geocode city center to reposition map
       const center = await geocodePlace(regionCity);
       if (center) {
         setMapCenter([center.lat, center.lng]);
@@ -137,6 +154,7 @@ function App() {
   const handleNavigate = async () => {
     if (isCalculating || loading || isComparingAll) return;
     
+    animAbortRef.current = false;
     setIsCalculating(true);
     setStatusMessage('Finding Best Routes...');
     const { finalStart, finalEnd } = await resolveLocations();
@@ -155,20 +173,38 @@ function App() {
       const data = await fetchRoute(finalStart, finalEnd, algorithm, preference);
       
       if (data && !data.error) {
-        setIsCalculating(false); // Hide loading overlay to show animations
+        setIsCalculating(false);
         const allExplored = data.explored || [];
         
-        // Optimized animation loop
+        // requestAnimationFrame based batching for Exploration
         if (allExplored.length > 0) {
-          const batchSize = Math.max(5, Math.floor(allExplored.length / 30));
-          for (let i = 0; i < allExplored.length; i += batchSize) {
-            const batch = allExplored.slice(i, i + batchSize);
-            setExploredNodes(prev => [...prev, ...batch]);
-            await new Promise(r => setTimeout(r, 20));
-          }
+          const batchSize = Math.max(100, Math.floor(allExplored.length / 50));
+          let currentIdx = 0;
+          
+          const animateExploration = () => {
+            if (animAbortRef.current) return;
+
+            const nextBatch = allExplored.slice(currentIdx, currentIdx + batchSize);
+            setExploredNodes(prev => [...prev, ...nextBatch]);
+            currentIdx += batchSize;
+            
+            if (currentIdx < allExplored.length) {
+              requestAnimationFrame(animateExploration);
+            }
+          };
+          
+          await new Promise(resolve => {
+            const startAnim = () => {
+              animateExploration();
+              setTimeout(resolve, Math.min(2000, (allExplored.length / batchSize) * 16 + 50));
+            };
+            startAnim();
+          });
         }
         
-        // Finalize paths and metrics
+        if (animAbortRef.current) return;
+
+        // Finalize metrics and snap markers (Recalculated dynamically)
         setMetrics({
           distance: data.paths[0]?.distance || 0,
           altDistance: data.paths[1]?.distance || null,
@@ -177,41 +213,73 @@ function App() {
           algo_time: data.algo_time
         });
         
-        // Snap markers to actual road nodes
         if (data.start_node_coords) setStart(data.start_node_coords);
         if (data.end_node_coords) setEnd(data.end_node_coords);
         
-        // Pause for 1 second after exploration before drawing paths
+        // Distinct pause after exploration so user can appreciate the search space
+        setStatusMessage('Search Complete. Finalizing Route...');
         await new Promise(r => setTimeout(r, 1000));
+        if (animAbortRef.current) return;
+        setStatusMessage('Drawing Path...');
 
-        // Staggered path drawing animation
+
+        // requestAnimationFrame based batching for Path Drawing
         const finalPaths = data.paths || [];
-        const animatedPaths = finalPaths.map(p => ({ ...p, segments: p.segments.map(s => ({ ...s, coords: [] })) }));
+        const animatedPaths = JSON.parse(JSON.stringify(finalPaths)).map(p => ({ 
+          ...p, 
+          segments: p.segments.map(s => ({ ...s, coords: [] })) 
+        }));
         setRoutes(animatedPaths);
 
         for (let pIdx = 0; pIdx < finalPaths.length; pIdx++) {
+          if (animAbortRef.current) break;
           const fullPath = finalPaths[pIdx];
           for (let sIdx = 0; sIdx < fullPath.segments.length; sIdx++) {
+            if (animAbortRef.current) break;
             const fullSegment = fullPath.segments[sIdx];
             const coords = fullSegment.coords;
-            const step = Math.max(1, Math.floor(coords.length / 10));
-            
-            for (let i = 0; i <= coords.length; i += step) {
-              const currentCoords = coords.slice(0, Math.min(i + step, coords.length));
-              setRoutes(prev => {
-                const newRoutes = [...prev];
-                newRoutes[pIdx].segments[sIdx].coords = currentCoords;
-                return newRoutes;
-              });
-              await new Promise(r => setTimeout(r, 10));
-            }
+            const step = Math.max(2, Math.floor(coords.length / 15));
+            let currentCoordIdx = 0;
+
+            await new Promise(resolve => {
+              const drawSegment = () => {
+                if (animAbortRef.current) {
+                  resolve();
+                  return;
+                }
+
+                currentCoordIdx = Math.min(currentCoordIdx + step, coords.length);
+                const currentCoords = coords.slice(0, currentCoordIdx);
+                
+                setRoutes(prev => {
+                  if (!prev[pIdx] || !prev[pIdx].segments || !prev[pIdx].segments[sIdx]) return prev;
+                  
+                  const newRoutes = [...prev];
+                  const newPath = { ...newRoutes[pIdx] };
+                  newPath.segments = [...newPath.segments];
+                  newPath.segments[sIdx] = { ...newPath.segments[sIdx], coords: currentCoords };
+                  newRoutes[pIdx] = newPath;
+                  
+                  return newRoutes;
+                });
+
+                if (currentCoordIdx < coords.length) {
+                  requestAnimationFrame(drawSegment);
+                } else {
+                  resolve();
+                }
+              };
+              requestAnimationFrame(drawSegment);
+            });
           }
         }
 
+        if (animAbortRef.current) return;
         setVisualizerData(data.graph_data);
         setStatusMessage('Success!');
         
         setTimeout(() => {
+          if (animAbortRef.current) return;
           setStatusMessage('');
           setShowVisualizerPrompt(true);
         }, 3000);
@@ -231,7 +299,9 @@ function App() {
   const handleCompare = async () => {
     if (isComparingAll || loading || isCalculating) return;
 
+    animAbortRef.current = true; // Stop any ongoing animations
     const { finalStart, finalEnd } = await resolveLocations();
+
     if (!finalStart || !finalEnd) {
       alert("Select start and end points first!");
       return;
@@ -239,12 +309,7 @@ function App() {
 
     setIsComparingAll(true);
     try {
-      const response = await fetch('http://localhost:5000/api/compare', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ start: finalStart, end: finalEnd, preference })
-      });
-      const data = await response.json();
+      const data = await compareRoutes(finalStart, finalEnd, preference);
       if (data && !data.error) {
         setDashboardData(data);
         setCurrentView('dashboard');
@@ -259,7 +324,9 @@ function App() {
     }
   };
 
+
   const handleClear = () => {
+    animAbortRef.current = true;
     setStart(null);
     setEnd(null);
     setSourceCity('');
@@ -271,6 +338,7 @@ function App() {
     setShowVisualizerPrompt(false);
     setVisualizerData(null);
   };
+
 
   return (
     <div className="app-container">

@@ -1,26 +1,52 @@
-# Python
-__pycache__/
-backend/__pycache__/
-backend/data/
-backend/.env
-*.py[cod]
-*$py.class
-data/*.pkl
-data/*.pkl.tmp
-cache/
+# Dependencies
+node_modules/
+frontend/node_modules/
 venv/
 ENV/
+.env
+.env.local
+.env.*
+!.env.example
+backend/.env
 
-# Node / Frontend
-frontend/node_modules/
+# Python Caches & Build
+__pycache__/
+backend/__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Data & Large Files
+data/
+backend/data/
+cache/
+*.pkl
+*.pkl.tmp
+*.db
+*.sqlite3
+
+# Frontend Build
+dist/
+dist-ssr/
 frontend/dist/
 frontend/build/
 .eslintcache
 
-# Environment Variables
-.env
-.env.local
-
 # OS Files
 .DS_Store
+.DS_Store?
+._*
 Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Editor & IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+.project
+.settings/
+.classpath

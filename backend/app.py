@@ -172,7 +172,7 @@ def compare_algorithms():
                 Keep it professional, insightful, and concise.
                 """
                 response = client.models.generate_content(
-                    model='gemini-2.0-flash',
+                    model='gemini-2.5-flash',
                     contents=prompt
                 )
                 ai_analysis = response.text

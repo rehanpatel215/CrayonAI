@@ -87,3 +87,18 @@ export const simulateTick = async () => {
     return null;
   }
 };
+
+export const compareRoutes = async (start, end, preference) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/compare`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ start, end, preference })
+    });
+    return await response.json();
+  } catch (error) {
+    console.error("Error comparing routes:", error);
+    return null;
+  }
+};
+
