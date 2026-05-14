@@ -31,14 +31,14 @@ const AIAnalystPanel = ({ text }) => {
   return (
     <div className="ai-analyst-panel glass">
       <div className="ai-header">
-        <Cpu size={24} />
-        <h2>Gemini AI Traffic Analyst</h2>
+        <Cpu size={24} color="var(--accent-blue)" />
+        <h2>Gemini AI Traffic Intelligence</h2>
       </div>
       
       {isTyping && (
         <button className="skip-btn" onClick={handleSkip}>
-          <SkipForward size={14} style={{ marginRight: '5px' }} />
-          Skip
+          <SkipForward size={14} />
+          Skip Analysis
         </button>
       )}
 
@@ -47,7 +47,7 @@ const AIAnalystPanel = ({ text }) => {
         {isTyping && <motion.span 
           animate={{ opacity: [1, 0] }} 
           transition={{ repeat: Infinity, duration: 0.8 }}
-          style={{ display: 'inline-block', width: '2px', height: '1em', background: '#58a6ff', marginLeft: '2px', verticalAlign: 'middle' }}
+          style={{ display: 'inline-block', width: '3px', height: '1.2em', background: 'var(--accent-blue)', marginLeft: '4px', verticalAlign: 'middle', borderRadius: '4px' }}
         />}
       </div>
     </div>

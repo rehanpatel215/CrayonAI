@@ -6,15 +6,15 @@ const GraphVisualizer = ({ data, onClose }) => {
 
   // Colors: 1=Blue (Primary), 2=Yellow (Alt), 3=Red (Discarded)
   const colors = {
-    1: "#58a6ff",
-    2: "#ffcc00",
-    3: "rgba(248, 81, 73, 0.4)"
+    1: "#4285f4",
+    2: "#fbbc04",
+    3: "rgba(234, 67, 53, 0.3)"
   };
 
   const nodeColors = {
-    1: "#58a6ff",
-    2: "#ffcc00",
-    3: "#f85149"
+    1: "#4285f4",
+    2: "#fbbc04",
+    3: "#ea4335"
   };
 
   // Find min/max for scaling

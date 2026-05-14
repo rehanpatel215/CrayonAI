@@ -1,16 +1,25 @@
 :root {
-  /* Color Palette - Deep Dark Theme */
-  --bg-primary: #0a0c10;
-  --bg-secondary: #161b22;
-  --accent-primary: #58a6ff; /* Neon Blue */
-  --accent-secondary: #7ee787; /* Success Green */
-  --accent-traffic: #f85149; /* Traffic Red */
-  --text-main: #c9d1d9;
-  --text-dim: #8b949e;
-  --glass-bg: rgba(22, 27, 34, 0.7);
-  --glass-border: rgba(255, 255, 255, 0.1);
+  /* Apple-inspired Technical Palette */
+  --bg-primary: #050e3c;
+  --bg-secondary: #0a194e;
+  --accent-blue: #0071e3; /* Apple Blue */
+  --accent-red: #ff3b30; /* Apple Red */
+  --accent-red-bright: #ff453a;
+  --accent-yellow: #ffcc00;
+  --accent-green: #34c759;
   
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  --text-main: #050e3c; /* High contrast dark navy */
+  --text-dim: #424245;
+  --text-on-accent: #ffffff;
+  
+  --glass-bg: rgba(255, 255, 255, 0.7); /* Increased opacity for better text contrast */
+  --glass-border: rgba(0, 0, 0, 0.1);
+  --liquid-highlight: rgba(0, 113, 227, 0.25);
+  
+  --card-shadow: 0 20px 40px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(255, 255, 255, 0.1);
+  --sidebar-width: 320px;
+
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Outfit', sans-serif;
 }
 
 * {
@@ -24,17 +33,63 @@ body {
   color: var(--text-main);
   overflow: hidden;
   margin: 0;
+  background-image: 
+    radial-gradient(circle at 50% 50%, rgba(0, 113, 227, 0.1) 0%, transparent 100%);
 }
 
-/* Glassmorphism Utility */
+/* Apple Liquid Glass Utility */
 .glass {
   background: var(--glass-bg);
-  backdrop-filter: blur(12px);
+  backdrop-filter: blur(50px) saturate(200%);
+  -webkit-backdrop-filter: blur(50px) saturate(200%);
   border: 1px solid var(--glass-border);
-  border-radius: 12px;
+  border-radius: 28px;
+  box-shadow: var(--card-shadow);
+  position: relative;
+  transition: all 0.5s cubic-bezier(0.23, 1, 0.32, 1);
 }
 
-/* Glowing Neon Path Animation */
+/* Liquid Blobs Animation */
+.glass::before, .glass::after {
+  content: '';
+  position: absolute;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle at center, var(--liquid-highlight) 0%, transparent 50%);
+  opacity: 0.3;
+  pointer-events: none;
+  z-index: -1;
+  filter: blur(40px);
+}
+
+.glass::before {
+  top: -100%;
+  left: -100%;
+  animation: liquid-rotate 20s infinite linear;
+}
+
+.glass::after {
+  bottom: -100%;
+  right: -100%;
+  animation: liquid-rotate 25s infinite linear reverse;
+}
+
+@keyframes liquid-rotate {
+  from { transform: rotate(0deg) translate(10%, 10%); }
+  to { transform: rotate(360deg) translate(-10%, -10%); }
+}
+
+/* Springy Hover Animation */
+.hover-lift {
+  transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.hover-lift:hover {
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4);
+}
+
+/* Glowing Path Animation */
 @keyframes dash {
   to {
     stroke-dashoffset: 0;
@@ -42,15 +97,15 @@ body {
 }
 
 .route-path-primary {
-  filter: drop-shadow(0 0 10px var(--accent-primary));
+  filter: drop-shadow(0 0 15px var(--accent-red-bright));
   stroke-dasharray: 2000;
   stroke-dashoffset: 2000;
-  animation: dash 3s linear forwards;
+  animation: dash 3s ease-out forwards;
 }
 
 .route-path-alt {
-  filter: drop-shadow(0 0 6px #ffcc00);
-  stroke-dasharray: 10, 10;
+  filter: drop-shadow(0 0 10px var(--accent-yellow));
+  stroke-dasharray: 12, 12;
   stroke-dashoffset: 1000;
   animation: dash 5s linear forwards;
 }
@@ -58,4 +113,17 @@ body {
 #root {
   width: 100%;
   height: 100vh;
+  position: relative;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle at 50% 50%, transparent 0%, var(--bg-primary) 90%);
+  z-index: -1;
+  pointer-events: none;
 }

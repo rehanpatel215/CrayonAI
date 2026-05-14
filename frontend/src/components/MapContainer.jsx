@@ -1,28 +1,33 @@
 import React, { useEffect } from 'react';
-import { MapContainer as LeafletMap, TileLayer, Marker, Polyline, useMapEvents, useMap, CircleMarker } from 'react-leaflet';
+import { MapContainer as LeafletMap, TileLayer, Marker, Polyline, useMapEvents, useMap, CircleMarker, ZoomControl } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
-// Fix for default marker icons in Leaflet + React
-import icon from 'leaflet/dist/images/marker-icon.png';
-import iconShadow from 'leaflet/dist/images/marker-shadow.png';
-
-let DefaultIcon = L.icon({
-    iconUrl: icon,
-    shadowUrl: iconShadow,
-    iconSize: [25, 41],
-    iconAnchor: [12, 41]
+const greenIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
 });
 
-L.Marker.prototype.options.icon = DefaultIcon;
+const redIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
+});
 
 const getTrafficColor = (state) => {
   switch (state) {
-    case 'green': return '#2eb82e';
-    case 'orange': return '#ff9933';
-    case 'red': return '#ff3333';
-    case 'blocked': return '#1a1a1a';
-    default: return '#58a6ff'; // Primary blue fallback
+    case 'green': return '#34a853';
+    case 'orange': return '#fbbc04';
+    case 'red': return '#ea4335';
+    case 'blocked': return '#202124';
+    default: return '#4285f4'; // Primary blue fallback
   }
 };
 
@@ -40,15 +45,17 @@ const MapViewHandler = ({ center, start, end, routes }) => {
     const map = useMap();
     
     useEffect(() => {
-        if (start && end && !routes.length) {
-            // Fit bounds to start/end markers only before path is found
+        if (start && end) {
             const bounds = L.latLngBounds([[start.lat, start.lng], [end.lat, end.lng]]);
-            map.fitBounds(bounds, { padding: [100, 100] });
-        } else if (center && !start && !end) {
-            // Center map on region change
-            map.setView(center, map.getZoom());
+            map.fitBounds(bounds, { 
+                padding: [120, 120], 
+                duration: 1.2, 
+                animate: true 
+            });
+        } else if (center) {
+            map.flyTo(center, 13, { duration: 1.5 });
         }
-    }, [center, start, end, routes, map]);
+    }, [start, end, center, map]); // Removed 'routes' from dependencies to stop zooming while searching
 
     return null;
 };
@@ -62,27 +69,30 @@ const MapContainer = ({ center, start, end, onMapClick, routes, exploredNodes })
         center={center || [40.7128, -74.0060]} 
         zoom={13} 
         scrollWheelZoom={true}
+        zoomControl={false} // Disable default top-left controls
         preferCanvas={true}
         style={{ height: "100%", width: "100%" }}
       >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
         />
+        
+        <ZoomControl position="bottomright" />
         
         <MapEvents onMapClick={onMapClick} />
         <MapViewHandler center={center} start={start} end={end} routes={routes} />
 
-        {/* Render Explored Nodes */}
+        {/* Render Explored Nodes as discrete dots */}
         {exploredNodes && exploredNodes.map((node, idx) => (
           <CircleMarker 
             key={idx}
             center={[node.lat, node.lng]}
-            radius={1.5}
+            radius={2}
             pathOptions={{ 
-              color: '#ffcc00', 
-              fillColor: '#ffcc00', 
-              fillOpacity: 0.6, 
+              color: 'var(--accent-blue)', 
+              fillColor: 'var(--accent-blue)', 
+              fillOpacity: 0.8, 
               stroke: false,
               className: 'explored-node-marker' 
             }}
@@ -90,12 +100,12 @@ const MapContainer = ({ center, start, end, onMapClick, routes, exploredNodes })
         ))}
 
         {start && (
-          <Marker position={[start.lat, start.lng]}>
+          <Marker position={[start.lat, start.lng]} icon={greenIcon}>
           </Marker>
         )}
 
         {end && (
-          <Marker position={[end.lat, end.lng]}>
+          <Marker position={[end.lat, end.lng]} icon={redIcon}>
           </Marker>
         )}
 
@@ -107,10 +117,11 @@ const MapContainer = ({ center, start, end, onMapClick, routes, exploredNodes })
                 key={`${index}-${sIdx}`}
                 positions={segment.coords.map(p => [p.lat, p.lng])}
                 pathOptions={{ 
-                  color: index === 0 ? getTrafficColor(segment.state) : '#ffcc00', 
-                  weight: index === 0 ? 6 : 4, 
-                  opacity: index === 0 ? 0.9 : 0.7,
-                  dashArray: index === 0 ? null : (segment.state === 'blocked' ? "5, 5" : null) 
+                  color: index === 0 ? getTrafficColor(segment.state) : 'var(--accent-yellow)', 
+                  weight: index === 0 ? 8 : 5, 
+                  opacity: index === 0 ? 0.95 : 0.7,
+                  dashArray: index === 0 ? null : (segment.state === 'blocked' ? "5, 5" : null),
+                  className: index === 0 ? 'route-path-primary' : 'route-path-alt'
                 }}
               />
             ));
@@ -120,10 +131,11 @@ const MapContainer = ({ center, start, end, onMapClick, routes, exploredNodes })
               key={index}
               positions={route.coords.map(p => [p.lat, p.lng])}
               pathOptions={{ 
-                color: index === 0 ? '#58a6ff' : '#ffcc00', 
-                weight: index === 0 ? 6 : 4, 
-                opacity: index === 0 ? 0.9 : 0.7,
-                dashArray: index === 0 ? null : "10, 10" 
+                color: index === 0 ? 'var(--accent-blue)' : 'var(--accent-yellow)', 
+                weight: index === 0 ? 8 : 5, 
+                opacity: index === 0 ? 0.95 : 0.7,
+                dashArray: index === 0 ? null : "10, 10",
+                className: index === 0 ? 'route-path-primary' : 'route-path-alt'
               }}
             />
           );

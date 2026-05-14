@@ -1,5 +1,7 @@
 import React from 'react';
-import { Navigation, Trash2 } from 'lucide-react';
+import { Navigation, Trash2, MapPin, Settings2, PlayCircle, StopCircle, BarChart3 } from 'lucide-react';
+import LocationInput from './LocationInput';
+import CustomSelect from './CustomSelect';
 
 const Sidebar = ({ 
   algorithm, 
@@ -25,87 +27,43 @@ const Sidebar = ({
   };
 
   return (
-    <aside className="sidebar glass">
-      <div className="sidebar-header">
-        <Navigation size={20} color="#58a6ff" />
-        <input 
-          type="text" 
-          placeholder="Region (e.g. Paris)" 
-          value={regionCity}
-          onChange={(e) => setRegionCity(e.target.value)}
-          onKeyDown={handleRegionKey}
-          className="region-input"
-        />
-      </div>
-
-      <div className="control-group">
-        <input 
-          type="text" 
-          placeholder="e.g. Times Square" 
+    <aside className="sidebar dynamic-island glass">
+      <div className="island-group address-group">
+        <LocationInput
+          placeholder="Origin"
           value={sourceCity}
-          onChange={(e) => setSourceCity(e.target.value)}
-          className="city-input"
+          onChange={setSourceCity}
+          icon={MapPin}
+          iconColor="var(--accent-red)"
         />
-        <input 
-          type="text" 
-          placeholder="e.g. Central Park" 
+        <div className="island-divider"></div>
+        <LocationInput
+          placeholder="Destination"
           value={destCity}
-          onChange={(e) => setDestCity(e.target.value)}
-          className="city-input"
+          onChange={setDestCity}
+          icon={MapPin}
+          iconColor="var(--accent-green)"
         />
       </div>
 
-      <div className="control-group">
-        <select 
-          value={algorithm} 
-          onChange={(e) => setAlgorithm(e.target.value)}
-          className="dropdown-select"
-        >
-          <option value="dijkstra">Dijkstra</option>
-          <option value="astar">A*</option>
-          <option value="greedy">Greedy</option>
-        </select>
+      <div className="island-divider-vertical"></div>
 
-        <select 
-          value={preference} 
-          onChange={(e) => setPreference(e.target.value)}
-          className="dropdown-select"
-          disabled={isSimulating}
-        >
-          <option value="length">Shortest</option>
-          <option value="travel_time">Fastest</option>
-        </select>
-      </div>
-
-      <div className="simulation-controls control-group">
+      <div className="island-group action-group">
+        <button className="btn-primary-island" onClick={onNavigate}>
+          Calculate
+        </button>
         <button 
-          className={`btn-sim ${isSimulating ? 'active' : ''}`}
+          className={`btn-sim-island ${isSimulating ? 'active' : ''}`}
           onClick={() => setIsSimulating(!isSimulating)}
+          title={isSimulating ? 'Stop Simulation' : 'Run Simulation'}
         >
-          {isSimulating ? 'Stop Simulation' : 'Start Simulation'}
+          {isSimulating ? <StopCircle size={18} /> : <PlayCircle size={18} />}
         </button>
-      </div>
-
-      {trafficEvents.length > 0 && (
-        <div className="event-log">
-          <h4>Live Traffic Events</h4>
-          <div className="event-list">
-            {trafficEvents.slice().reverse().map((event, i) => (
-              <div key={i} className="event-item">{event}</div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div className="action-buttons">
-        <button className="btn-primary" onClick={onNavigate}>
-          Start
+        <button className="btn-ghost-island" onClick={onCompare} title="Performance Analysis">
+          <BarChart3 size={18} />
         </button>
-        <button className="btn-secondary" onClick={onClear}>
-          <Trash2 size={16} />
-        </button>
-        <button className="btn-ghost" onClick={onCompare}>
-          Compare
+        <button className="btn-secondary-island" onClick={onClear} title="Reset All">
+          <Trash2 size={18} />
         </button>
       </div>
     </aside>

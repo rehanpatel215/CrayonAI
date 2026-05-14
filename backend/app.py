@@ -124,7 +124,7 @@ def find_route():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-import google.generativeai as genai
+from google import genai
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -132,10 +132,9 @@ load_dotenv()
 # Configure Gemini
 api_key = os.getenv("GEMINI_API_KEY")
 if api_key:
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-2.5-flash')
+    client = genai.Client(api_key=api_key)
 else:
-    model = None
+    client = None
 
 @app.route('/api/compare', methods=['POST'])
 def compare_algorithms():
@@ -156,7 +155,7 @@ def compare_algorithms():
         
         # 2. Generate AI analysis if possible
         ai_analysis = "AI analysis unavailable (API key missing or error)."
-        if model:
+        if client:
             try:
                 prompt = f"""
                 Act as a Smart Traffic Analyst for an AI Pathfinding System.
@@ -172,7 +171,10 @@ def compare_algorithms():
                 
                 Keep it professional, insightful, and concise.
                 """
-                response = model.generate_content(prompt)
+                response = client.models.generate_content(
+                    model='gemini-2.0-flash',
+                    contents=prompt
+                )
                 ai_analysis = response.text
             except Exception as ai_err:
                 print(f"Gemini API Error: {ai_err}")

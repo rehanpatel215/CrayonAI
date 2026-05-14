@@ -6,6 +6,10 @@ import GraphVisualizer from './components/GraphVisualizer';
 import ComparisonDashboard from './components/ComparisonDashboard';
 import { fetchRoute, updateTraffic, geocodePlace, loadCity, fetchTrafficState, simulateTick } from './services/api';
 import './App.css';
+import FloatingTile from './components/FloatingTile';
+import LocationInput from './components/LocationInput';
+import CustomSelect from './components/CustomSelect';
+import { Navigation, MapPin, StopCircle, PlayCircle, BarChart3, Trash2, Pencil } from 'lucide-react';
 
 function App() {
   const [start, setStart] = useState(null);
@@ -20,6 +24,7 @@ function App() {
   const [metrics, setMetrics] = useState(null);
   const [comparisonData, setComparisonData] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [isCalculating, setIsCalculating] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
   const [mapCenter, setMapCenter] = useState([40.7128, -74.0060]); // Manhattan
   const [showVisualizerPrompt, setShowVisualizerPrompt] = useState(false);
@@ -130,10 +135,14 @@ function App() {
   };
 
   const handleNavigate = async () => {
+    if (isCalculating || loading || isComparingAll) return;
+    
+    setIsCalculating(true);
     setStatusMessage('Finding Best Routes...');
     const { finalStart, finalEnd } = await resolveLocations();
 
     if (!finalStart || !finalEnd) {
+      setIsCalculating(false);
       setStatusMessage('');
       alert("Please provide both start and destination");
       return;
@@ -146,6 +155,7 @@ function App() {
       const data = await fetchRoute(finalStart, finalEnd, algorithm, preference);
       
       if (data && !data.error) {
+        setIsCalculating(false); // Hide loading overlay to show animations
         const allExplored = data.explored || [];
         
         // Optimized animation loop
@@ -213,10 +223,14 @@ function App() {
       console.error(err);
       setStatusMessage('Network Error: Could not reach backend');
       setTimeout(() => setStatusMessage(''), 5000);
+    } finally {
+      setIsCalculating(false);
     }
   };
 
   const handleCompare = async () => {
+    if (isComparingAll || loading || isCalculating) return;
+
     const { finalStart, finalEnd } = await resolveLocations();
     if (!finalStart || !finalEnd) {
       alert("Select start and end points first!");
@@ -260,30 +274,132 @@ function App() {
 
   return (
     <div className="app-container">
-      <Sidebar 
-        algorithm={algorithm} 
-        setAlgorithm={setAlgorithm}
-        preference={preference}
-        setPreference={setPreference}
-        sourceCity={sourceCity}
-        setSourceCity={setSourceCity}
-        destCity={destCity}
-        setDestCity={setDestCity}
-        regionCity={regionCity}
-        setRegionCity={setRegionCity}
-        onNavigate={handleNavigate}
-        onClear={handleClear}
-        onCompare={handleCompare}
-        onRegionChange={handleRegionChange}
-        isSimulating={isSimulating}
-        setIsSimulating={setIsSimulating}
-        trafficEvents={trafficEvents}
-      />
+      {/* Top Header Row */}
+      <div className="layout-top-header">
+        <FloatingTile className="region-tile">
+          <span className="control-label">Active Region</span>
+          <input 
+            type="text" 
+            placeholder="Search Region" 
+            value={regionCity}
+            onChange={(e) => setRegionCity(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleRegionChange()}
+            className="city-input compact"
+          />
+        </FloatingTile>
+
+        <FloatingTile className="modular-journey-tile">
+          <LocationInput
+            placeholder="Origin"
+            value={sourceCity}
+            onChange={setSourceCity}
+            icon={MapPin}
+            iconColor="var(--accent-red)"
+          />
+          <div className="tile-divider-v"></div>
+          <LocationInput
+            placeholder="Destination"
+            value={destCity}
+            onChange={setDestCity}
+            icon={MapPin}
+            iconColor="var(--accent-green)"
+          />
+        </FloatingTile>
+
+        <FloatingTile className="modular-logic-tile">
+          <CustomSelect 
+            label="Algorithm"
+            value={algorithm}
+            onChange={setAlgorithm}
+            options={[
+              { value: 'dijkstra', label: 'Dijkstra' },
+              { value: 'astar', label: 'A* AI' },
+              { value: 'greedy', label: 'Greedy' }
+            ]}
+          />
+          <div className="tile-divider-v"></div>
+          <CustomSelect 
+            label="Goal"
+            value={preference}
+            onChange={setPreference}
+            options={[
+              { value: 'length', label: 'Shortest' },
+              { value: 'travel_time', label: 'Fastest' }
+            ]}
+          />
+        </FloatingTile>
+
+        <FloatingTile className="modular-action-tile">
+          <button className="btn-primary-compact" onClick={handleNavigate}>
+            Calculate
+          </button>
+          <div className="tile-divider-v"></div>
+          <button className={`btn-text-glass ${isSimulating ? 'active' : ''}`} onClick={() => setIsSimulating(!isSimulating)}>
+            {isSimulating ? <StopCircle size={16} /> : <PlayCircle size={16} />}
+            <span>{isSimulating ? 'Stop' : 'Simulate'}</span>
+          </button>
+          <button className="btn-text-glass" onClick={handleCompare}>
+            <BarChart3 size={16} />
+            <span>Compare</span>
+          </button>
+          <button className="btn-secondary-red" onClick={handleClear} title="Reset All">
+            <Trash2 size={16} />
+          </button>
+        </FloatingTile>
+      </div>
+
+      {/* Bottom Left: Brand Identity */}
+      <div className="layout-bottom-left">
+        <FloatingTile className="brand-tile">
+          <div className="brand-logo-container">
+            <svg width="32" height="32" viewBox="0 0 32 32" className="brand-logo-svg">
+              <path 
+                d="M4,24 Q12,12 20,24 T28,12" 
+                fill="none" 
+                stroke="var(--accent-blue)" 
+                strokeWidth="3" 
+                strokeLinecap="round"
+                className="brand-road-path"
+              />
+              <g className="brand-crayon">
+                <Pencil size={14} color="var(--accent-blue)" />
+              </g>
+            </svg>
+          </div>
+          <h2>CrayonAI</h2>
+        </FloatingTile>
+      </div>
       
       <main className="app-content">
-        {loading && <div className="loading-overlay">Performing Comparison...</div>}
-        
-        {statusMessage && (
+        {(loading || isCalculating || isComparingAll) && (
+          <div className="loading-dashboard-overlay">
+            <div className="crayon-loader">
+              <svg width="300" height="150" viewBox="-30 -30 260 160" className="crayon-loader-svg">
+                {/* Multi-colored paths */}
+                <path d="M20,50 Q60,20 100,50 T180,50" fill="none" strokeWidth="6" strokeDasharray="200" strokeDashoffset="200" className="draw-path path-blue" />
+                <path d="M20,50 Q60,20 100,50 T180,50" fill="none" strokeWidth="6" strokeDasharray="200" strokeDashoffset="200" className="draw-path path-green" />
+                <path d="M20,50 Q60,20 100,50 T180,50" fill="none" strokeWidth="6" strokeDasharray="200" strokeDashoffset="200" className="draw-path path-yellow" />
+                <path d="M20,50 Q60,20 100,50 T180,50" fill="none" strokeWidth="6" strokeDasharray="200" strokeDashoffset="200" className="draw-path path-red" />
+                
+                <g className="crayon-icon">
+                  <Pencil size={36} color="var(--accent-blue)" style={{ transform: 'rotate(-45deg)' }} />
+                </g>
+              </svg>
+              <h2>CrayonAI <span className="highlight">
+                {isComparingAll ? 'Analysis' : isCalculating ? 'Optimizing' : 'Loading'}
+              </span></h2>
+              <div className="loading-steps">
+                <span>
+                  {isComparingAll ? 'Evaluating Multi-Path Scenarios' : 
+                   isCalculating ? 'Calculating Smartest Route' : 
+                   'Fetching Live Traffic Data'}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {statusMessage && !isCalculating && !loading && !isComparingAll && (
           <div className="status-toast glass">
             {statusMessage}
           </div>
@@ -327,14 +443,6 @@ function App() {
             data={comparisonData} 
             onClose={() => setComparisonData(null)} 
           />
-        )}
-
-        {isComparingAll && (
-          <div className="loading-dashboard">
-            <div className="spinner"></div>
-            <h2>Running Comparative Analysis...</h2>
-            <p>Evaluating 5 different algorithms under current traffic conditions</p>
-          </div>
         )}
 
         {currentView === 'dashboard' && (
